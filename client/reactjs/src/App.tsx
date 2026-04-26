@@ -21,8 +21,6 @@ export default function App() {
                 <Route path="/my-generation" element={<MyGeneration />} />
                 <Route path="/preview" element={<YtPreview />} />
                 <Route path="/login" element={<Login />} />
-                <Route path="/login" element={<SignUp />} />
-                <Route path="/login" element={<SignIn />} />
             </Routes>
             <Footer />
         </>
