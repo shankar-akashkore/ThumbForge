@@ -3,6 +3,7 @@ import { useState } from "react";
 import { colorSchemes, type AspectRatio, type IThumbnail, type ThumbnailStyle } from "../assets 2/assets";
 import { SoftBackdrop } from "../components/SoftBackdrop";
 import { AspectRatioSelector } from "../components/AspectRatioSelector";
+import { StyleSelector } from "../components/StyleSelector";
 
 
 export const Generate = () => {
@@ -46,7 +47,12 @@ export const Generate = () => {
 
                 {/* RatioSelector */}
                 <AspectRatioSelector value={aspectRatio} onChange={setAspectRatio}/>
+
+
                 {/* StyleSelector */}
+                <StyleSelector value={style} onChange={setStyle} isOpen={styleDropdownOpen} setIsOpen={setStyleDropdownOpen}/>
+
+                
                 {/* ColorSelector */}
 
                 {/* Details */}
