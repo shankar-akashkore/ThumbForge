@@ -2,7 +2,8 @@ import { useEffect, useState } from "react"
 import { SoftBackdrop } from "../components/SoftBackdrop"
 import { dummyThumbnails, type IThumbnail } from "../assets 2/assets"
 import { image } from "motion/react-client"
-import { useNavigate } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
+import { ArrowUpRightIcon, DownloadIcon, TrashIcon } from "lucide-react"
 
 
 export const MyGeneration = () => {
@@ -84,6 +85,32 @@ export const MyGeneration = () => {
 
                   {thumb.isGenerating && 
                   <div className="absolute inset-0 bg-black/50 flex-center justify-center text-sm font-medium text-white">Generating....</div>}
+                </div>
+
+                {/* Content */}
+                <div className="p-4 space-y-2">
+                  <h3 className="text-sm font=semibold text-zinc-100">{thumb.title}</h3>
+                  <div className="flex flex-wrap gap-2 text-xs text-zinc-400">
+                    <span className="px-3 py-0.5 rounded bg-white/8">{thumb.style}</span>
+                    <span className="px-3 py-0.5 rounded bg-white/8">{thumb.color_scheme}</span>
+                    <span className="px-3 py-0.5 rounded bg-white/8">{thumb.aspect_ratio}</span>
+                  </div>
+
+                  <p className="text-xs text-zinc-500">{new Date(thumb.createdAt!).toDateString()}</p>
+                </div>
+
+                <div onClick={(e) => e.stopPropagation()} className="absolute bottom-2 right-2 max-sm:flex sm:hidden group-hover:flex gap-1.5">
+
+                  <TrashIcon onClick={() => handleDelete(thumb._id)}
+                  className="size-6 bg-black/50 p-1 rounded hover:bg-pink-600 transition-all"/>
+
+                  <DownloadIcon onClick={() => handleDownload(thumb.image_url!)}
+                  className="size-6 bg-black/50 p-1 rounded hover:bg-pink-600 transition-all"/>
+
+                  <Link target="_blank" to={`/preview?thumbnail_url=${thumb.image_url}&title=${thumb.title}`}>
+                  <ArrowUpRightIcon 
+                  className="size-6 bg-black/50 p-1 rounded hover:bg-pink-600 transition-all"/>
+                  </Link>
                 </div>
               </div>
             )
