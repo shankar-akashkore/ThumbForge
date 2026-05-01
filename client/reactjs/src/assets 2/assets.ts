@@ -45,8 +45,9 @@ export interface IThumbnail {
     prompt_used?: string;
     user_prompt?: string;
     isGenerating?: boolean;
-    createdAt?: Date;
-    updatedAt?: Date;
+    createdAt?: string | Date;
+    updatedAt?: string | Date;
+    __v?: number;
 }
 
 export interface IUser {
@@ -57,7 +58,7 @@ export interface IUser {
     updatedAt?: Date;
 }
 
-export const dummyThumbnails = [
+export const dummyThumbnails: IThumbnail[] = [
     {
         _id: "69451ff3c9ea67e4c930f6a6",
         userId: "6942b3bd2a93a220baa331b3",

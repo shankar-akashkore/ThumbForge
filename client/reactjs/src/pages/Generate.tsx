@@ -1,6 +1,6 @@
 import { useParams } from "react-router-dom"
-import { useState } from "react";
-import { colorSchemes, type AspectRatio, type IThumbnail, type ThumbnailStyle } from "../assets 2/assets";
+import { useEffect, useState } from "react";
+import { colorSchemes, dummyThumbnails, type AspectRatio, type IThumbnail, type ThumbnailStyle } from "../assets 2/assets";
 import { SoftBackdrop } from "../components/SoftBackdrop";
 import { AspectRatioSelector } from "../components/AspectRatioSelector";
 import { StyleSelector } from "../components/StyleSelector";
@@ -21,6 +21,35 @@ export const Generate = () => {
   const [style, setStyle] = useState<ThumbnailStyle>('Bold & Graphic')
 
   const [styleDropdownOpen, setStyleDropdownOpen] = useState(false);
+
+  const handleGenerate = async() => {
+
+  }
+
+  const fetchThumbnail = async() => {
+    if(id) {
+      const thumbnail = dummyThumbnails.find((thumbnail) => thumbnail._id === id);
+      if (!thumbnail) {
+        setThumbnail(null);
+        setLoading(false);
+        return;
+      }
+
+      setThumbnail(thumbnail)
+      setAdditionalDetails(thumbnail.user_prompt || '')
+      setTitle(thumbnail.title)
+      setColorSchemeId(thumbnail.color_scheme || colorSchemes[0].id)
+      setAspectRatio(thumbnail.aspect_ratio || '16:9')
+      setStyle(thumbnail.style)
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if(id) {
+      fetchThumbnail();
+    }
+  }, [id])
 
   return (
     <>
@@ -71,7 +100,7 @@ export const Generate = () => {
 
               {/* Button */}
               {!id && (
-                <button className="text-[15px] w-full py-3.5 rounded-xl font-medium bg-linear-to-b from-pink-500 to-pink-600 hover:from-pink-700 disabled:cursor-not-allowed transition-colors">
+                <button onClick={handleGenerate} className="text-[15px] w-full py-3.5 rounded-xl font-medium bg-linear-to-b from-pink-500 to-pink-600 hover:from-pink-700 disabled:cursor-not-allowed transition-colors">
                   {loading ? "Generating..." : "Generate Thumbnail"}
                 </button>
               )}

@@ -30,7 +30,7 @@ export const PreviewPannel = ({thumbnail, isLoading, aspectRatio} : {thumbnail: 
             )}
 
             {/* Image Preview */}
-            {isLoading && thumbnail?.image_url && (
+            {!isLoading && thumbnail?.image_url && (
                 <div className="group relative h-full w-full">
                     <img src={thumbnail?.image_url} alt={thumbnail.title} className="h-full w-full object-cover"/>
                         <div className="absolute inset-0 flex items-end justify-center bg-black/10 opacity-0 transition-opacity group-hover:opacity-100">
