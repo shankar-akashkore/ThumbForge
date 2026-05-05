@@ -5,6 +5,7 @@ import path from 'path';
 import ai from '../configs/ai.js';
 import fs from 'fs';
 import { v2 as cloudinary } from 'cloudinary';
+import { json } from 'node:stream/consumers';
 
 
 const stylePrompts = {
@@ -131,6 +132,22 @@ export const generateThumbnail = async (req: Request, res: Response) => {
         res.json({ message: 'Thumbnail Generated', thumbnail})
 
         fs.unlinkSync(filePath);
+
+    } catch (error: any) {
+        console.log(error);
+        res.status(500).json({ message: error.message });
+    }
+}
+
+export const deleteThumbnail = async (req: Request, res: Response) => {
+    try {
+
+        const {id} = req.params;
+        const {userId} = req.session;
+
+        await Thumbnail.findByIdAndDelete({_id: id, userId});
+
+        res.json({ message: 'Thumbnail delete successfully'});
 
     } catch (error: any) {
         console.log(error);
