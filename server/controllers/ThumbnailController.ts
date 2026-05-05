@@ -1,9 +1,10 @@
 import { Request, Response } from 'express';
 import Thumbnail from '../models/Thumbnail.js';
 import { GenerateContentConfig, HarmBlockThreshold, HarmCategory } from '@google/genai';
-import { config } from 'dotenv';
 import path from 'path';
 import ai from '../configs/ai.js';
+import fs from 'fs';
+import { v2 as cloudinary } from 'cloudinary';
 
 
 const stylePrompts = {
@@ -117,10 +118,22 @@ export const generateThumbnail = async (req: Request, res: Response) => {
         const filename = `final-output-${Date.now()}.png`;
         const filePath = path.join('images', filename);
 
-        
+        fs.mkdirSync('images', { recursive: true });
 
+        fs.writeFileSync(filePath, finalBuffer!);
 
-    } catch (error) {
+        const uploadResult = await cloudinary.uploader.upload(filePath, {resource_type: 'image', folder: 'thumbnails'});
 
+        thumbnail.image_url = uploadResult.url;
+        thumbnail.isGenerating = false;
+        await thumbnail.save();
+
+        res.json({ message: 'Thumbnail Generated', thumbnail})
+
+        fs.unlinkSync(filePath);
+
+    } catch (error: any) {
+        console.log(error);
+        res.status(500).json({ message: error.message });
     }
 }
