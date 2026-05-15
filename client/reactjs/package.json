@@ -20,6 +20,7 @@
     "react-fast-marquee": "^1.6.5",
     "react-hot": "^0.0.1",
     "react-router-dom": "^7.8.2",
+    "react-toastify": "^11.1.0",
     "tailwindcss": "^4.1.13",
     "toast": "^0.5.4"
   },
