@@ -1,15 +1,21 @@
-import { useParams } from "react-router-dom"
+import { useLocation, useNavigate, useParams } from "react-router-dom"
 import { useEffect, useState } from "react";
-import { colorSchemes, dummyThumbnails, type AspectRatio, type IThumbnail, type ThumbnailStyle } from "../assets 2/assets";
+import { colorSchemes, type AspectRatio, type IThumbnail, type ThumbnailStyle } from "../assets 2/assets";
 import { SoftBackdrop } from "../components/SoftBackdrop";
 import { AspectRatioSelector } from "../components/AspectRatioSelector";
 import { StyleSelector } from "../components/StyleSelector";
 import { ColorSchemesSelector } from "../components/ColorSchemesSelector";
 import { PreviewPannel } from "../components/PreviewPannel";
+import { useAuth } from "../context/AuthContext";
+import toast from "react-hot-toast";
+import api from "../configs/api";
 
 
 export const Generate = () => {
   const {id} = useParams();
+  const {pathname} = useLocation();
+  const navigate = useNavigate();
+  const {isLoggedIn} = useAuth();
   const [title, setTitle] = useState('')
   const [additionalDetails, setAdditionalDetails] = useState('');
 
@@ -23,33 +29,63 @@ export const Generate = () => {
   const [styleDropdownOpen, setStyleDropdownOpen] = useState(false);
 
   const handleGenerate = async() => {
+    if(!isLoggedIn) return toast.error("Please login to generate a thumbnail");
+      if(!title.trim()) return toast.error("Please enter a title or topic for the thumbnail")
+        setLoading(true);
 
+
+      const api_payload = {
+        title,
+        prompt: additionalDetails,
+        style,
+        aspect_ratio: aspectRatio,
+        color_scheme: colorSchemeId,
+        text_overlay: true
+      }
+
+      const {data} = await api.post('/api/thumbnail/generate', api_payload);
+
+      if(data.thumbnail) {
+        navigate('/generate/' + data.thumbnail._id);
+        toast.success(data.message);
+      }
   }
 
   const fetchThumbnail = async() => {
-    if(id) {
-      const thumbnail = dummyThumbnails.find((thumbnail) => thumbnail._id === id);
-      if (!thumbnail) {
-        setThumbnail(null);
-        setLoading(false);
-        return;
-      }
+    try {
+      const {data} = await api.get(`/api/user/thumbnail/${id}`);
 
-      setThumbnail(thumbnail)
-      setAdditionalDetails(thumbnail.user_prompt || '')
-      setTitle(thumbnail.title)
-      setColorSchemeId(thumbnail.color_scheme || colorSchemes[0].id)
-      setAspectRatio(thumbnail.aspect_ratio || '16:9')
-      setStyle(thumbnail.style)
-      setLoading(false);
+      setThumbnail(data?.thumbnail as IThumbnail);
+      setLoading(!data?.thumbnail?.image_url);
+      setAdditionalDetails(data?.thumbnail?.user_prompt)
+      setTitle(data?.thumbnail?.title)
+      setColorSchemeId(data?.thumbnail?.color_scheme)
+      setAspectRatio(data?.thumbnail?.aspect_ratio)
+      setStyle(data?.thumbnail?.style)
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error?.response?.data?.message || "Failed to fetch thumbnail details");
     }
   }
 
   useEffect(() => {
-    if(id) {
+    if(isLoggedIn && id) {
       fetchThumbnail();
     }
-  }, [id])
+    if(id && loading && isLoggedIn) {
+      const interval = setInterval(() => {
+        fetchThumbnail();
+      },5000);
+
+      return () => clearInterval(interval);
+    }
+  }, [id, loading, isLoggedIn])
+
+  useEffect(() => {
+    if(!id && thumbnail) {
+      setThumbnail(null);
+    }
+  },[pathname])
 
   return (
     <>
