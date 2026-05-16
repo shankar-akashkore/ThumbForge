@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import type { IUser } from "../assets 2/assets";
 import api from "../configs/api";
-import { toast } from "react-toastify";
+import toast from "react-hot-toast";
 
 
 
