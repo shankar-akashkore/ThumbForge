@@ -1,7 +1,7 @@
 import Thumbnail from '../models/Thumbnail.js';
 import { HarmBlockThreshold, HarmCategory } from '@google/genai';
 import path from 'path';
-import ai from '../configs/ai.js';
+import { getGoogleAiClients } from '../configs/ai.js';
 import fs from 'fs';
 import { v2 as cloudinary } from 'cloudinary';
 const stylePrompts = {
@@ -61,11 +61,25 @@ export const generateThumbnail = async (req, res) => {
             prompt += `Additional details: ${user_prompt}`;
         }
         prompt += `The thumbnail should be ${aspect_ratio}, visually stunning, and designed to maximize click-through rate. Make it bold, professional, and impossible to ignore!`;
-        const response = await ai.models.generateContent({
-            model,
-            contents: [prompt],
-            config: generationConfig
-        });
+        let response;
+        let lastError;
+        for (const ai of getGoogleAiClients()) {
+            try {
+                response = await ai.models.generateContent({
+                    model,
+                    contents: [prompt],
+                    config: generationConfig
+                });
+                break;
+            }
+            catch (error) {
+                lastError = error;
+                console.warn("Thumbnail generation failed with one Gemini key. Trying next key if available.");
+            }
+        }
+        if (!response) {
+            throw lastError || new Error('Thumbnail generation failed');
+        }
         if (!response?.candidates?.[0]?.content?.parts) {
             throw new Error('No content generated');
         }

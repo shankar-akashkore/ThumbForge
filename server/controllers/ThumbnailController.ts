@@ -1,11 +1,9 @@
 import { Request, Response } from 'express';
 import Thumbnail from '../models/Thumbnail.js';
-import { GenerateContentConfig, HarmBlockThreshold, HarmCategory } from '@google/genai';
 import path from 'path';
 import ai from '../configs/ai.js';
 import fs from 'fs';
 import { v2 as cloudinary } from 'cloudinary';
-import { json } from 'node:stream/consumers';
 
 
 const stylePrompts = {
@@ -38,10 +36,16 @@ const colorSchemaDescriptions = {
     pastel: 'soft pastel colors, low saturation, gentle tones, calm and friendly aesthetic',
 }
 
+const aspectRatioToSize: Record<string, '1792x1024' | '1024x1024' | '1024x1792'> = {
+    '16:9': '1792x1024',
+    '1:1':  '1024x1024',
+    '9:16': '1024x1792',
+}
+
 
 export const generateThumbnail = async (req: Request, res: Response) => {
     try {
-        
+
         const {userId} = req.session;
         const {
             title,
@@ -62,70 +66,49 @@ export const generateThumbnail = async (req: Request, res: Response) => {
             color_scheme,
             text_overlay,
             isGenerating: true
-
         })
 
-        const model = 'gemini-3-pro-image-preview';
-
-        const generationConfig : GenerateContentConfig = {
-            maxOutputTokens: 32768,
-            temperature: 1,
-            topP: 0.95,
-            responseModalities: ['IMAGE'],
-            imageConfig: {
-                aspectRatio: aspect_ratio || '16:9',
-                imageSize: '1k'
-            },
-            safetySettings: [
-                { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.OFF },
-                { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.OFF },
-                { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.OFF },
-                { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.OFF },
-            ]
-        }
-
-        let prompt = `Create a ${stylePrompts[style as keyof typeof stylePrompts]} for: "${title}`;
+        let prompt = `Create a ${stylePrompts[style as keyof typeof stylePrompts]} YouTube thumbnail for: "${title}". `;
 
         if(color_scheme) {
-            prompt += `Use a ${colorSchemaDescriptions[color_scheme as keyof typeof colorSchemaDescriptions]} color scheme.`
+            prompt += `Use a ${colorSchemaDescriptions[color_scheme as keyof typeof colorSchemaDescriptions]} color scheme. `;
         }
 
         if(user_prompt) {
-            prompt += `Additional details: ${user_prompt}`;
+            prompt += `Additional details: ${user_prompt}. `;
         }
 
         prompt += `The thumbnail should be ${aspect_ratio}, visually stunning, and designed to maximize click-through rate. Make it bold, professional, and impossible to ignore!`
 
-        const response: any = await ai.models.generateContent({
-            model,
-            contents: [prompt],
-            config: generationConfig
-        })
+        const size = aspectRatioToSize[aspect_ratio] || '1792x1024';
 
-        if(!response?.candidates?.[0]?.content?.parts) {
-            throw new Error('No content generated');
+        const response = await ai.images.generate({
+            model: 'dall-e-3',
+            prompt,
+            n: 1,
+            size,
+            response_format: 'b64_json',
+            quality: 'hd',
+        });
+
+        const b64 = response.data?.[0]?.b64_json;
+
+        if (!b64) {
+            throw new Error('No image generated');
         }
 
-        const parts = response.candidates[0].content.parts;
-
-        let finalBuffer: Buffer | null = null;
-
-        for(const part of parts) {
-            if(part.inlineData) {
-                finalBuffer = Buffer.from(part.inlineData.data, 'base64')
-            }
-        }
+        const finalBuffer = Buffer.from(b64, 'base64');
 
         const filename = `final-output-${Date.now()}.png`;
         const filePath = path.join('images', filename);
 
         fs.mkdirSync('images', { recursive: true });
-
-        fs.writeFileSync(filePath, finalBuffer!);
+        fs.writeFileSync(filePath, finalBuffer);
 
         const uploadResult = await cloudinary.uploader.upload(filePath, {resource_type: 'image', folder: 'thumbnails'});
 
         thumbnail.image_url = uploadResult.url;
+        thumbnail.prompt_used = prompt;
         thumbnail.isGenerating = false;
         await thumbnail.save();
 
