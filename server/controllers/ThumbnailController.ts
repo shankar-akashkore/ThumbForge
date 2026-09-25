@@ -1,8 +1,6 @@
 import { Request, Response } from 'express';
 import Thumbnail from '../models/Thumbnail.js';
-import path from 'path';
-import ai from '../configs/ai.js';
-import fs from 'fs';
+import { generateImage } from '../configs/ai.js';
 import { v2 as cloudinary } from 'cloudinary';
 
 
@@ -36,14 +34,12 @@ const colorSchemaDescriptions = {
     pastel: 'soft pastel colors, low saturation, gentle tones, calm and friendly aesthetic',
 }
 
-const aspectRatioToSize: Record<string, '1792x1024' | '1024x1024' | '1024x1792'> = {
-    '16:9': '1792x1024',
-    '1:1':  '1024x1024',
-    '9:16': '1024x1792',
-}
+const aspectRatios = ['16:9', '1:1', '9:16'];
 
 
 export const generateThumbnail = async (req: Request, res: Response) => {
+    let thumbnailId: string | undefined;
+
     try {
 
         const {userId} = req.session;
@@ -67,6 +63,7 @@ export const generateThumbnail = async (req: Request, res: Response) => {
             text_overlay,
             isGenerating: true
         })
+        thumbnailId = thumbnail._id;
 
         let prompt = `Create a ${stylePrompts[style as keyof typeof stylePrompts]} YouTube thumbnail for: "${title}". `;
 
@@ -80,45 +77,40 @@ export const generateThumbnail = async (req: Request, res: Response) => {
 
         prompt += `The thumbnail should be ${aspect_ratio}, visually stunning, and designed to maximize click-through rate. Make it bold, professional, and impossible to ignore!`
 
-        const size = aspectRatioToSize[aspect_ratio] || '1792x1024';
+        const ratio = aspectRatios.includes(aspect_ratio) ? aspect_ratio : '16:9';
+        const image = await generateImage(prompt, ratio);
 
-        const response = await ai.images.generate({
-            model: 'dall-e-3',
-            prompt,
-            n: 1,
-            size,
-            response_format: 'b64_json',
-            quality: 'hd',
+        // Upload the base64 image directly: serverless filesystems are read-only outside /tmp
+        const upload = (background?: string) => cloudinary.uploader.upload(`data:${image.mimeType || 'image/png'};base64,${image.data}`, {
+            resource_type: 'image',
+            folder: 'thumbnails',
+            transformation: background ? [{ aspect_ratio: ratio, crop: 'pad', background }] : undefined,
         });
 
-        const b64 = response.data?.[0]?.b64_json;
+        // Square fallback images are extended to the chosen ratio with Cloudinary's generative fill
+        // (cropping would cut off the title text); plain padding is the backup if generative fill fails
+        const uploadResult = image.square && ratio !== '1:1'
+            ? await upload('gen_fill').catch((error) => { console.log(error); return upload('auto'); })
+            : await upload();
 
-        if (!b64) {
-            throw new Error('No image generated');
-        }
-
-        const finalBuffer = Buffer.from(b64, 'base64');
-
-        const filename = `final-output-${Date.now()}.png`;
-        const filePath = path.join('images', filename);
-
-        fs.mkdirSync('images', { recursive: true });
-        fs.writeFileSync(filePath, finalBuffer);
-
-        const uploadResult = await cloudinary.uploader.upload(filePath, {resource_type: 'image', folder: 'thumbnails'});
-
-        thumbnail.image_url = uploadResult.url;
+        thumbnail.image_url = uploadResult.secure_url;
         thumbnail.prompt_used = prompt;
         thumbnail.isGenerating = false;
         await thumbnail.save();
 
         res.json({ message: 'Thumbnail Generated', thumbnail})
 
-        fs.unlinkSync(filePath);
-
     } catch (error: any) {
         console.log(error);
-        res.status(500).json({ message: error.message });
+        // Don't leave a record stuck in "Generating..." when generation fails
+        if(thumbnailId) {
+            await Thumbnail.deleteOne({ _id: thumbnailId }).catch(console.log);
+        }
+        // Quota errors arrive as long JSON strings; show something readable instead
+        const message = [402, 429].includes(error?.status)
+            ? 'Image generation limit reached: the free quota or prepaid credits are used up, or billing is not enabled.'
+            : error.message;
+        res.status(500).json({ message });
     }
 }
 
@@ -128,7 +120,11 @@ export const deleteThumbnail = async (req: Request, res: Response) => {
         const {id} = req.params;
         const {userId} = req.session;
 
-        await Thumbnail.findByIdAndDelete({_id: id, userId});
+        const deleted = await Thumbnail.findOneAndDelete({_id: id, userId});
+
+        if(!deleted) {
+            return res.status(404).json({ message: 'Thumbnail not found' });
+        }
 
         res.json({ message: 'Thumbnail delete successfully'});
 

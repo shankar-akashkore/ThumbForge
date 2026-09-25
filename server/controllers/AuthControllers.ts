@@ -1,13 +1,16 @@
 import { Request, Response } from "express";
 import User from "../models/User.js";
 import bcrypt from "bcrypt";
-import { error } from "console";
 
 // Register
 export const registerUser = async (req: Request, res: Response) => {
     try {
 
         const {name, email, password} = req.body;
+
+        if(typeof name !== 'string' || typeof email !== 'string' || typeof password !== 'string' || !name.trim() || !email.trim() || !password) {
+            return res.status(400).json({message: 'Name, email and password are required'});
+        }
 
         const user = await User.findOne({email});
 
@@ -48,6 +51,10 @@ export const loginUser = async (req: Request, res: Response) => {
 
         const {email, password} = req.body;
 
+        if(typeof email !== 'string' || typeof password !== 'string') {
+            return res.status(400).json({message: 'Invalid email or password'});
+        }
+
         const user = await User.findOne({email});
 
         if(!user) {
@@ -85,8 +92,8 @@ export const logoutUser = async (req: Request, res: Response) => {
             console.log(error);
             return res.status(500).json({message : error.message})
         }
+        return res.json({message: 'Logout successful'})
     })
-    return res.json({message: 'Logout successful'})
 }
 
 //verfiy

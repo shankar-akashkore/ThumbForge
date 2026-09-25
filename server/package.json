@@ -6,8 +6,9 @@
   "type": "module",
   "scripts": {
     "start": "tsx server.ts",
-    "server": "nodemon --exec tsx server.ts",
-    "build": "tsc"
+    "server": "nodemon --watch . --watch .env --exec tsx server.ts",
+    "build": "tsc",
+    "test": "vitest run"
   },
   "keywords": [],
   "author": "",
@@ -20,9 +21,9 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.7.0",
     "express-session": "^1.19.0",
-    "mongoose": "^9.6.1",
-    "openai": "^6.38.0"
+    "mongoose": "^9.6.1"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
@@ -33,6 +34,7 @@
     "nodemon": "^3.1.14",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.2"
   }
 }
