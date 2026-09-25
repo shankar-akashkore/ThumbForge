@@ -4,6 +4,9 @@ import bcrypt from "bcrypt";
 export const registerUser = async (req, res) => {
     try {
         const { name, email, password } = req.body;
+        if (typeof name !== 'string' || typeof email !== 'string' || typeof password !== 'string' || !name.trim() || !email.trim() || !password) {
+            return res.status(400).json({ message: 'Name, email and password are required' });
+        }
         const user = await User.findOne({ email });
         if (user) {
             return res.status(400).json({ message: 'User already exists' });
@@ -34,6 +37,9 @@ export const registerUser = async (req, res) => {
 export const loginUser = async (req, res) => {
     try {
         const { email, password } = req.body;
+        if (typeof email !== 'string' || typeof password !== 'string') {
+            return res.status(400).json({ message: 'Invalid email or password' });
+        }
         const user = await User.findOne({ email });
         if (!user) {
             return res.status(400).json({ message: 'Invalid email or password' });
@@ -65,8 +71,8 @@ export const logoutUser = async (req, res) => {
             console.log(error);
             return res.status(500).json({ message: error.message });
         }
+        return res.json({ message: 'Logout successful' });
     });
-    return res.json({ message: 'Logout successful' });
 };
 //verfiy
 export const verfiyUser = async (req, res) => {

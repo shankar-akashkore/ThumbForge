@@ -1,8 +1,5 @@
 import Thumbnail from '../models/Thumbnail.js';
-import { HarmBlockThreshold, HarmCategory } from '@google/genai';
-import path from 'path';
-import { getGoogleAiClients } from '../configs/ai.js';
-import fs from 'fs';
+import { generateImage } from '../configs/ai.js';
 import { v2 as cloudinary } from 'cloudinary';
 const stylePrompts = {
     'Bold & Graphic': 'eye-catching thumbnail, bold typography, vibrant colors, expressive facial reaction, dramatic lighting, high contrast, click-worthy composition, professional style',
@@ -21,7 +18,9 @@ const colorSchemaDescriptions = {
     ocean: 'cool blue and teal tones, aquatic color palette, fresh and clean atmosphere',
     pastel: 'soft pastel colors, low saturation, gentle tones, calm and friendly aesthetic',
 };
+const aspectRatios = ['16:9', '1:1', '9:16'];
 export const generateThumbnail = async (req, res) => {
+    let thumbnailId;
     try {
         const { userId } = req.session;
         const { title, prompt: user_prompt, style, aspect_ratio, color_scheme, text_overlay } = req.body;
@@ -36,81 +35,55 @@ export const generateThumbnail = async (req, res) => {
             text_overlay,
             isGenerating: true
         });
-        const model = 'gemini-3-pro-image-preview';
-        const generationConfig = {
-            maxOutputTokens: 32768,
-            temperature: 1,
-            topP: 0.95,
-            responseModalities: ['IMAGE'],
-            imageConfig: {
-                aspectRatio: aspect_ratio || '16:9',
-                imageSize: '1k'
-            },
-            safetySettings: [
-                { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.OFF },
-                { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.OFF },
-                { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.OFF },
-                { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.OFF },
-            ]
-        };
-        let prompt = `Create a ${stylePrompts[style]} for: "${title}`;
+        thumbnailId = thumbnail._id;
+        let prompt = `Create a ${stylePrompts[style]} YouTube thumbnail for: "${title}". `;
         if (color_scheme) {
-            prompt += `Use a ${colorSchemaDescriptions[color_scheme]} color scheme.`;
+            prompt += `Use a ${colorSchemaDescriptions[color_scheme]} color scheme. `;
         }
         if (user_prompt) {
-            prompt += `Additional details: ${user_prompt}`;
+            prompt += `Additional details: ${user_prompt}. `;
         }
         prompt += `The thumbnail should be ${aspect_ratio}, visually stunning, and designed to maximize click-through rate. Make it bold, professional, and impossible to ignore!`;
-        let response;
-        let lastError;
-        for (const ai of getGoogleAiClients()) {
-            try {
-                response = await ai.models.generateContent({
-                    model,
-                    contents: [prompt],
-                    config: generationConfig
-                });
-                break;
-            }
-            catch (error) {
-                lastError = error;
-                console.warn("Thumbnail generation failed with one Gemini key. Trying next key if available.");
-            }
-        }
-        if (!response) {
-            throw lastError || new Error('Thumbnail generation failed');
-        }
-        if (!response?.candidates?.[0]?.content?.parts) {
-            throw new Error('No content generated');
-        }
-        const parts = response.candidates[0].content.parts;
-        let finalBuffer = null;
-        for (const part of parts) {
-            if (part.inlineData) {
-                finalBuffer = Buffer.from(part.inlineData.data, 'base64');
-            }
-        }
-        const filename = `final-output-${Date.now()}.png`;
-        const filePath = path.join('images', filename);
-        fs.mkdirSync('images', { recursive: true });
-        fs.writeFileSync(filePath, finalBuffer);
-        const uploadResult = await cloudinary.uploader.upload(filePath, { resource_type: 'image', folder: 'thumbnails' });
-        thumbnail.image_url = uploadResult.url;
+        const ratio = aspectRatios.includes(aspect_ratio) ? aspect_ratio : '16:9';
+        const image = await generateImage(prompt, ratio);
+        // Upload the base64 image directly: serverless filesystems are read-only outside /tmp
+        const upload = (background) => cloudinary.uploader.upload(`data:${image.mimeType || 'image/png'};base64,${image.data}`, {
+            resource_type: 'image',
+            folder: 'thumbnails',
+            transformation: background ? [{ aspect_ratio: ratio, crop: 'pad', background }] : undefined,
+        });
+        // Square fallback images are extended to the chosen ratio with Cloudinary's generative fill
+        // (cropping would cut off the title text); plain padding is the backup if generative fill fails
+        const uploadResult = image.square && ratio !== '1:1'
+            ? await upload('gen_fill').catch((error) => { console.log(error); return upload('auto'); })
+            : await upload();
+        thumbnail.image_url = uploadResult.secure_url;
+        thumbnail.prompt_used = prompt;
         thumbnail.isGenerating = false;
         await thumbnail.save();
         res.json({ message: 'Thumbnail Generated', thumbnail });
-        fs.unlinkSync(filePath);
     }
     catch (error) {
         console.log(error);
-        res.status(500).json({ message: error.message });
+        // Don't leave a record stuck in "Generating..." when generation fails
+        if (thumbnailId) {
+            await Thumbnail.deleteOne({ _id: thumbnailId }).catch(console.log);
+        }
+        // Quota errors arrive as long JSON strings; show something readable instead
+        const message = [402, 429].includes(error?.status)
+            ? 'Image generation limit reached: the free quota or prepaid credits are used up, or billing is not enabled.'
+            : error.message;
+        res.status(500).json({ message });
     }
 };
 export const deleteThumbnail = async (req, res) => {
     try {
         const { id } = req.params;
         const { userId } = req.session;
-        await Thumbnail.findByIdAndDelete({ _id: id, userId });
+        const deleted = await Thumbnail.findOneAndDelete({ _id: id, userId });
+        if (!deleted) {
+            return res.status(404).json({ message: 'Thumbnail not found' });
+        }
         res.json({ message: 'Thumbnail delete successfully' });
     }
     catch (error) {
