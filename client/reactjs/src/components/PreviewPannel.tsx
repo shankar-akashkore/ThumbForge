@@ -13,7 +13,7 @@ export const PreviewPannel = ({thumbnail, isLoading, aspectRatio} : {thumbnail: 
     const onDownload = () => {
         if(!thumbnail?.image_url) return;
         const link = document.createElement('a');
-        link.href = thumbnail?.image_url.replace('/uploads', '/uploads/f1_attachment');
+        link.href = thumbnail.image_url.replace('/upload/', '/upload/fl_attachment/');
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -48,7 +48,7 @@ export const PreviewPannel = ({thumbnail, isLoading, aspectRatio} : {thumbnail: 
 
             {/* Empty status */}
             {!isLoading && !thumbnail?.image_url && (
-                <div className="absolute inset-0 m-2 flex flex-col items-center justify-center gap-4 rounded-lg border-2 border-dashed border-white/20 ng-black/25">
+                <div className="absolute inset-0 m-2 flex flex-col items-center justify-center gap-4 rounded-lg border-2 border-dashed border-white/20 bg-black/25">
                     <div className="max-sm:hidden flex size-20 items-center justify-center rounded-full bg-white/10">
                     <ImageIcon className="size-10 text-white/50 opacity-50"/>
                     </div>

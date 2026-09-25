@@ -31,6 +31,7 @@ export const Generate = () => {
   const handleGenerate = async() => {
     if(!isLoggedIn) return toast.error("Please login to generate a thumbnail");
       if(!title.trim()) return toast.error("Please enter a title or topic for the thumbnail")
+      if(loading) return;
         setLoading(true);
 
 
@@ -43,11 +44,18 @@ export const Generate = () => {
         text_overlay: true
       }
 
-      const {data} = await api.post('/api/thumbnail/generate', api_payload);
+      try {
+        const {data} = await api.post('/api/thumbnail/generate', api_payload);
 
-      if(data.thumbnail) {
-        navigate('/generate/' + data.thumbnail._id);
-        toast.success(data.message);
+        if(data.thumbnail) {
+          navigate('/generate/' + data.thumbnail._id);
+          toast.success(data.message);
+        }
+      } catch (error: any) {
+        console.error(error);
+        toast.error(error?.response?.data?.message || "Failed to generate thumbnail");
+      } finally {
+        setLoading(false);
       }
   }
 
@@ -55,13 +63,20 @@ export const Generate = () => {
     try {
       const {data} = await api.get(`/api/user/thumbnail/${id}`);
 
-      setThumbnail(data?.thumbnail as IThumbnail);
-      setLoading(!data?.thumbnail?.image_url);
-      setAdditionalDetails(data?.thumbnail?.user_prompt)
-      setTitle(data?.thumbnail?.title)
-      setColorSchemeId(data?.thumbnail?.color_scheme)
-      setAspectRatio(data?.thumbnail?.aspect_ratio)
-      setStyle(data?.thumbnail?.style)
+      if(!data?.thumbnail) {
+        setLoading(false);
+        toast.error("Thumbnail not found");
+        return navigate('/generate');
+      }
+
+      const thumb = data.thumbnail as IThumbnail;
+      setThumbnail(thumb);
+      setLoading(!thumb.image_url);
+      setAdditionalDetails(thumb.user_prompt ?? '')
+      setTitle(thumb.title ?? '')
+      setColorSchemeId(thumb.color_scheme ?? colorSchemes[0].id)
+      setAspectRatio(thumb.aspect_ratio ?? '16:9')
+      setStyle(thumb.style)
     } catch (error: any) {
       console.error(error);
       toast.error(error?.response?.data?.message || "Failed to fetch thumbnail details");
@@ -136,7 +151,7 @@ export const Generate = () => {
 
               {/* Button */}
               {!id && (
-                <button onClick={handleGenerate} className="text-[15px] w-full py-3.5 rounded-xl font-medium bg-linear-to-b from-pink-500 to-pink-600 hover:from-pink-700 disabled:cursor-not-allowed transition-colors">
+                <button onClick={handleGenerate} disabled={loading} className="text-[15px] w-full py-3.5 rounded-xl font-medium bg-linear-to-b from-pink-500 to-pink-600 hover:from-pink-700 disabled:cursor-not-allowed transition-colors">
                   {loading ? "Generating..." : "Generate Thumbnail"}
                 </button>
               )}

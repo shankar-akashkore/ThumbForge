@@ -32,12 +32,14 @@ export const MyGeneration = () => {
     } catch (error: any) {
       console.log(error);
       toast.error(error?.response?.data?.message || "Failed to fetch thumbnails");
+    } finally {
+      setLoading(false);
     }
   }
 
   const handleDownload = (image_url: string) => {
     const link = document.createElement('a');
-        link.href = image_url.replace('/uploads', '/uploads/f1_attachment');
+        link.href = image_url.replace('/upload/', '/upload/fl_attachment/');
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -94,7 +96,7 @@ export const MyGeneration = () => {
 
       {/* Grid */}
       {!loading && thumbnails.length > 0 && (
-        <div className="columns-1 sm:colums-2 lg:columns-3 2xl:columns-4 gap-8">
+        <div className="columns-1 sm:columns-2 lg:columns-3 2xl:columns-4 gap-8">
           {thumbnails.map((thumb: IThumbnail) => {
             const aspectClass = aspectRatioClassMap[thumb.aspect_ratio || '16:9'];
 
@@ -111,12 +113,12 @@ export const MyGeneration = () => {
                   )}
 
                   {thumb.isGenerating && 
-                  <div className="absolute inset-0 bg-black/50 flex-center justify-center text-sm font-medium text-white">Generating....</div>}
+                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-sm font-medium text-white">Generating....</div>}
                 </div>
 
                 {/* Content */}
                 <div className="p-4 space-y-2">
-                  <h3 className="text-sm font=semibold text-zinc-100">{thumb.title}</h3>
+                  <h3 className="text-sm font-semibold text-zinc-100">{thumb.title}</h3>
                   <div className="flex flex-wrap gap-2 text-xs text-zinc-400">
                     <span className="px-3 py-0.5 rounded bg-white/8">{thumb.style}</span>
                     <span className="px-3 py-0.5 rounded bg-white/8">{thumb.color_scheme}</span>
@@ -134,7 +136,7 @@ export const MyGeneration = () => {
                   <DownloadIcon onClick={() => handleDownload(thumb.image_url!)}
                   className="size-6 bg-black/50 p-1 rounded hover:bg-pink-600 transition-all"/>
 
-                  <Link target="_blank" to={`/preview?thumbnail_url=${thumb.image_url}&title=${thumb.title}`}>
+                  <Link target="_blank" to={`/preview?thumbnail_url=${encodeURIComponent(thumb.image_url || '')}&title=${encodeURIComponent(thumb.title)}`}>
                   <ArrowUpRightIcon 
                   className="size-6 bg-black/50 p-1 rounded hover:bg-pink-600 transition-all"/>
                   </Link>
